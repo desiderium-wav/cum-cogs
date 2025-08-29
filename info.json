@@ -1,0 +1,12 @@
+{
+  "author": ["desiderium-wav"],
+  "install_msg": "Thanks for installing the Flash cog! Use `[p]flashset channel #channel` and `[p]flashset role @role` to configure.",
+  "name": "Flash",
+  "short": "Temporary flash batch handler.",
+  "description": "Handles temporary media batches in a channel with automatic spoiler enforcement and batch deletion.",
+  "requirements": [],
+  "tags": ["media", "flash", "spoiler"],
+  "min_bot_version": "3.4.0",
+  "hidden": false,
+  "disabled": false
+}
