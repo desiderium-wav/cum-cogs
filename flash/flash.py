@@ -29,33 +29,49 @@ class Flash(commands.Cog):
         return any(filename.endswith(ext) for ext in MEDIA_EXTENSIONS)
 
     async def enforce_spoiler_with_webhook(self, message: discord.Message, media_attachments):
-        all_spoilers = all(att.is_spoiler() for att in media_attachments)
-        if all_spoilers:
-            return message  # Already spoilered, do nothing
+        """
+        Reposts a message via webhook, ensuring all media attachments are spoilered and
+        the configured flash role is pinged, while preserving the full original content.
+        """
+        guild = message.guild
+        flash_ping_role_id = await self.config.guild(guild).flash_ping_role_id()
+        flash_ping_role = guild.get_role(flash_ping_role_id) if flash_ping_role_id else None
 
         channel = message.channel
         webhook = await channel.create_webhook(name="FlashSpoiler")
 
         try:
+            # Prepare files with spoiler filenames if needed
             files = []
             for attachment in media_attachments:
                 file_bytes = await attachment.read()
                 spoiler_filename = f"SPOILER_{attachment.filename}" if not attachment.is_spoiler() else attachment.filename
                 files.append(discord.File(io.BytesIO(file_bytes), filename=spoiler_filename))
 
+            # Delete original message
             await message.delete()
+
+            # Preserve the full original content, prepend role ping
+            content = message.content or ""
+            if flash_ping_role:
+                content = f"{flash_ping_role.mention} {content}"
+
+            # Send via webhook
             await webhook.send(
-                content=message.content or None,
+                content=content if content else None,
                 username=message.author.display_name,
                 avatar_url=message.author.display_avatar.url,
-                files=files
+                files=files,
+                allowed_mentions=discord.AllowedMentions(roles=[flash_ping_role] if flash_ping_role else [])
             )
 
+            # Fetch the new webhook message
             history = [m async for m in channel.history(limit=1)]
             return history[0] if history else None
 
         finally:
             await webhook.delete()
+
 
     async def start_flash_timer(self, batch_id: int):
         await asyncio.sleep(300)
@@ -78,51 +94,42 @@ class Flash(commands.Cog):
 
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):
-        # Avoid recursion/other bots
         if message.author.bot:
             return
+
         guild = message.guild
         if not guild:
             return
 
         flash_channel_id = await self.config.guild(guild).flash_channel_id()
-        flash_ping_role_id = await self.config.guild(guild).flash_ping_role_id()
-        if not flash_channel_id or not flash_ping_role_id:
-            return
-
-        if message.channel.id != flash_channel_id:
+        if not flash_channel_id or message.channel.id != flash_channel_id:
             return
 
         media_attachments = [att for att in message.attachments if self.is_media_attachment(att)]
-
         if media_attachments:
+        # This now handles both the spoilered attachments AND the role ping
             new_message = await self.enforce_spoiler_with_webhook(message, media_attachments)
             if not new_message:
                 return
 
-            flash_ping_role = message.guild.get_role(flash_ping_role_id)
-            ping_message = None
-            if flash_ping_role:
-             ping_message = await message.channel.send(
-                 f"<@&{flash_ping_role.id}>",
-                 allowed_mentions=discord.AllowedMentions(roles=True)
-             )
-
+            # Track the batch
             batch_id = new_message.id
             self.batches[batch_id] = {
                 "start_message": new_message,
                 "messages": [new_message],
             }
-            if ping_message:
-                self.batches[batch_id]["messages"].append(ping_message)
+
+            # Start the 5-minute deletion timer
             self.bot.loop.create_task(self.start_flash_timer(batch_id))
+
         else:
+            # If no attachments, just add message to latest batch or delete it
             if not self.batches:
                 await message.delete()
             else:
                 latest_batch_id = next(reversed(self.batches))
                 self.batches[latest_batch_id]["messages"].append(message)
-
+            
     @commands.command(name="showbatches")
     @commands.admin_or_permissions(administrator=True)
     async def show_batches(self, ctx):
