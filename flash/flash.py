@@ -146,6 +146,16 @@ class Flash(commands.Cog):
             )
         await ctx.send("\n\n".join(msg_lines))
 
+    @commands.command()
+    @commands.admin_or_permissions(administrator=True)
+    async def testping(self, ctx):
+        """Test pinging the flash role."""
+        role = ctx.guild.get_role(YOUR_FLASH_ROLE_ID_HERE)  # replace with the actual role ID
+        if not role:
+            await ctx.send("Role not found!")
+            return
+        await ctx.send(f"Pinging role: {role.mention}")
+
     @commands.group()
     @commands.admin_or_permissions(administrator=True)
     async def flashset(self, ctx):
