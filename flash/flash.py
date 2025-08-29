@@ -30,36 +30,30 @@ class Flash(commands.Cog):
 
     async def enforce_spoiler_with_webhook(self, message: discord.Message, media_attachments):
         """
-        Reposts a message via webhook, ensuring all media attachments are spoilered and
-        the configured flash role is NOT pinged here (ping is sent separately).
+        Reposts a message via webhook, ensuring all media attachments are spoilered.
+        The role ping is sent separately to guarantee it works.
         """
         channel = message.channel
         webhook = await channel.create_webhook(name="FlashSpoiler")
 
         try:
-            # Prepare files with spoiler filenames if needed
             files = []
             for attachment in media_attachments:
                 file_bytes = await attachment.read()
                 spoiler_filename = f"SPOILER_{attachment.filename}" if not attachment.is_spoiler() else attachment.filename
                 files.append(discord.File(io.BytesIO(file_bytes), filename=spoiler_filename))
 
-            # Preserve full original content
             content = message.content or ""
-
-            # Delete original message
             await message.delete()
 
-            # Send via webhook
             await webhook.send(
                 content=content if content else None,
                 username=message.author.display_name,
                 avatar_url=message.author.display_avatar.url,
                 files=files,
-                allowed_mentions=discord.AllowedMentions.none()  # Don't ping anything from webhook
+                allowed_mentions=discord.AllowedMentions.none()  # no pings from webhook
             )
 
-            # Fetch the new webhook message
             history = [m async for m in channel.history(limit=1)]
             return history[0] if history else None
 
@@ -103,33 +97,33 @@ class Flash(commands.Cog):
 
         media_attachments = [att for att in message.attachments if self.is_media_attachment(att)]
         if media_attachments:
-            # Repost the message with spoilered attachments via webhook
+            # Repost message via webhook
             new_message = await self.enforce_spoiler_with_webhook(message, media_attachments)
             if not new_message:
                 return
 
-            # Track the batch
+            # Track batch
             batch_id = new_message.id
             self.batches[batch_id] = {
                 "start_message": new_message,
                 "messages": [new_message],
             }
 
-            # Send the ping separately after a tiny delay
+            # Send role ping separately
             flash_ping_role = guild.get_role(flash_ping_role_id)
             if flash_ping_role:
-                await asyncio.sleep(0.1)  # prevents race/caching issues
+                print(f"[FlashPing] Sending ping for role ID: {flash_ping_role.id}")  # debug
+                await asyncio.sleep(0.5)  # avoid race/cache issues
                 ping_message = await message.channel.send(
                     flash_ping_role.mention,
                     allowed_mentions=discord.AllowedMentions(roles=[flash_ping_role])
                 )
                 self.batches[batch_id]["messages"].append(ping_message)
 
-            # Start the 5-minute deletion timer
+            # Start deletion timer
             self.bot.loop.create_task(self.start_flash_timer(batch_id))
 
         else:
-            # If no attachments, just add message to latest batch or delete it
             if not self.batches:
                 await message.delete()
             else:
