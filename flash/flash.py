@@ -31,12 +31,8 @@ class Flash(commands.Cog):
     async def enforce_spoiler_with_webhook(self, message: discord.Message, media_attachments):
         """
         Reposts a message via webhook, ensuring all media attachments are spoilered and
-        the configured flash role is pinged, while preserving the full original content.
+        the configured flash role is NOT pinged here (ping is sent separately).
         """
-        guild = message.guild
-        flash_ping_role_id = await self.config.guild(guild).flash_ping_role_id()
-        flash_ping_role = guild.get_role(flash_ping_role_id) if flash_ping_role_id else None
-
         channel = message.channel
         webhook = await channel.create_webhook(name="FlashSpoiler")
 
@@ -48,13 +44,11 @@ class Flash(commands.Cog):
                 spoiler_filename = f"SPOILER_{attachment.filename}" if not attachment.is_spoiler() else attachment.filename
                 files.append(discord.File(io.BytesIO(file_bytes), filename=spoiler_filename))
 
+            # Preserve full original content
+            content = message.content or ""
+
             # Delete original message
             await message.delete()
-
-            # Preserve the full original content, prepend role ping
-            content = message.content or ""
-            if flash_ping_role:
-                content = f"{flash_ping_role.mention} {content}"
 
             # Send via webhook
             await webhook.send(
@@ -62,7 +56,7 @@ class Flash(commands.Cog):
                 username=message.author.display_name,
                 avatar_url=message.author.display_avatar.url,
                 files=files,
-                allowed_mentions=discord.AllowedMentions(roles=[flash_ping_role] if flash_ping_role else [])
+                allowed_mentions=discord.AllowedMentions.none()  # Don't ping anything from webhook
             )
 
             # Fetch the new webhook message
@@ -71,7 +65,6 @@ class Flash(commands.Cog):
 
         finally:
             await webhook.delete()
-
 
     async def start_flash_timer(self, batch_id: int):
         await asyncio.sleep(300)
@@ -102,12 +95,15 @@ class Flash(commands.Cog):
             return
 
         flash_channel_id = await self.config.guild(guild).flash_channel_id()
-        if not flash_channel_id or message.channel.id != flash_channel_id:
+        flash_ping_role_id = await self.config.guild(guild).flash_ping_role_id()
+        if not flash_channel_id or not flash_ping_role_id:
+            return
+        if message.channel.id != flash_channel_id:
             return
 
         media_attachments = [att for att in message.attachments if self.is_media_attachment(att)]
         if media_attachments:
-        # This now handles both the spoilered attachments AND the role ping
+            # Repost the message with spoilered attachments via webhook
             new_message = await self.enforce_spoiler_with_webhook(message, media_attachments)
             if not new_message:
                 return
@@ -119,6 +115,16 @@ class Flash(commands.Cog):
                 "messages": [new_message],
             }
 
+            # Send the ping separately after a tiny delay
+            flash_ping_role = guild.get_role(flash_ping_role_id)
+            if flash_ping_role:
+                await asyncio.sleep(0.1)  # prevents race/caching issues
+                ping_message = await message.channel.send(
+                    flash_ping_role.mention,
+                    allowed_mentions=discord.AllowedMentions(roles=[flash_ping_role])
+                )
+                self.batches[batch_id]["messages"].append(ping_message)
+
             # Start the 5-minute deletion timer
             self.bot.loop.create_task(self.start_flash_timer(batch_id))
 
@@ -129,7 +135,7 @@ class Flash(commands.Cog):
             else:
                 latest_batch_id = next(reversed(self.batches))
                 self.batches[latest_batch_id]["messages"].append(message)
-            
+
     @commands.command(name="showbatches")
     @commands.admin_or_permissions(administrator=True)
     async def show_batches(self, ctx):
