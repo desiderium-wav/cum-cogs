@@ -104,7 +104,7 @@ class Flash(commands.Cog):
             ping_message = None
             if flash_ping_role:
                 ping_message = await message.channel.send(
-                    f"{flash_ping_role.mention}",
+                    f"<@&{flash_ping_role.id}>",
                     allowed_mentions=discord.AllowedMentions(roles=[flash_ping_role])
                 )
 
