@@ -1,0 +1,1 @@
+from .uwulock import setup
