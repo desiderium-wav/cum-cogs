@@ -1,7 +1,8 @@
+# uwulock.py
 import discord
 from redbot.core import commands, Config
-from .uwuipy import uwuify  # your existing uwuify function
-import asyncio  # for sleep/delay
+from .uwuipy import uwuify
+import asyncio
 
 class uwulock(commands.Cog):
     """Locks a user into uwuified torment."""
@@ -86,6 +87,8 @@ class uwulock(commands.Cog):
             except (discord.Forbidden, discord.HTTPException):
                 pass
 
-
-async def setup(bot):
-    await bot.add_cog(uwulock(bot))
+# ----------------------------
+# Setup function (synchronous!)
+# ----------------------------
+def setup(bot):
+    bot.add_cog(uwulock(bot))
