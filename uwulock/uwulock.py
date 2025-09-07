@@ -1,10 +1,9 @@
-# uwulock.py
 import discord
 from redbot.core import commands, Config
 from .uwuipy import uwuify
 import asyncio
 
-class uwulock(commands.Cog):
+class UwuLock(commands.Cog):
     """Locks a user into uwuified torment."""
 
     def __init__(self, bot):
@@ -26,7 +25,6 @@ class uwulock(commands.Cog):
             await self.config.uwulocked_user_ids.set(uwulocked)
             msg = await ctx.send(f"💖 **{member.display_name}** is now uwulocked. Prepare for suffering.")
 
-        # Auto-delete the command and response
         await asyncio.sleep(0.5)
         try:
             await ctx.message.delete()
@@ -48,7 +46,6 @@ class uwulock(commands.Cog):
         else:
             msg = await ctx.send(f"😇 **{member.display_name}** was not uwulocked.")
 
-        # Auto-delete the command and response
         await asyncio.sleep(0.5)
         try:
             await ctx.message.delete()
@@ -86,9 +83,3 @@ class uwulock(commands.Cog):
                 )
             except (discord.Forbidden, discord.HTTPException):
                 pass
-
-# ----------------------------
-# Setup function (synchronous!)
-# ----------------------------
-def setup(bot):
-    bot.add_cog(uwulock(bot))
