@@ -1,0 +1,10 @@
+{
+  "name": "Quotes",
+  "author": ["desiderium-wav"],
+  "short": "Quote messages into a dedicated quotes channel.",
+  "description": "Reply or react to messages to save them as styled quote images with pagination, deletion, and filtering.",
+  "install_msg": "Quotes cog installed. Use [p]q or react with 💬 to quote messages.",
+  "requirements": ["Pillow"],
+  "tags": ["quotes", "utility"],
+  "min_bot_version": "3.5.0"
+}
