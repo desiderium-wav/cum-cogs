@@ -41,7 +41,7 @@ class QuoteListView(discord.ui.View):
         self.page = (len(self.quotes)-1)//self.per_page
         await interaction.response.edit_message(embed=self.make_embed(), view=self)
 
-    @discord.ui.button(emoji="❌", style=discord.ButtonStyle.danger)
+    @discord.ui.button(emoji="✖️", style=discord.ButtonStyle.danger)
     async def close(self, interaction, _):
         await interaction.message.delete()
 
@@ -57,7 +57,7 @@ class ConfirmResetView(discord.ui.View):
         await self.cog.config.guild(self.guild).clear()
         await interaction.message.delete()
 
-    @discord.ui.button(emoji="❌", style=discord.ButtonStyle.danger)
+    @discord.ui.button(emoji="✖️", style=discord.ButtonStyle.danger)
     async def cancel(self, interaction, _):
         await interaction.message.delete()
 
