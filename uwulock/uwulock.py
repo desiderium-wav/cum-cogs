@@ -1,9 +1,9 @@
 import discord
 from redbot.core import commands, Config
-from .uwuipy import uwuify
+from .uwuipy import Uwuipy
 import asyncio
 
-class UwuLock(commands.Cog):
+class Uwulock(commands.Cog):
     """Locks a user into uwuified torment."""
 
     def __init__(self, bot):
@@ -23,7 +23,7 @@ class UwuLock(commands.Cog):
         else:
             uwulocked.append(member.id)
             await self.config.uwulocked_user_ids.set(uwulocked)
-            msg = await ctx.send(f"💖 **{member.display_name}** is now uwulocked. Prepare for suffering.")
+            msg = await ctx.send(f"💖 **{member.display_name}** is now uwulocked. Suffer.")
 
         await asyncio.sleep(0.5)
         try:
