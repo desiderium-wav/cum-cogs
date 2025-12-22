@@ -1,4 +1,4 @@
-from .uwulock import UwuLock
+from .uwulock import Uwulock
 
 async def setup(bot):
-    await bot.add_cog(UwuLock(bot))
+    await bot.add_cog(Uwulock(bot))
