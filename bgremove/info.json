@@ -1,11 +1,11 @@
 {
   "name": "bgremove",
   "author": ["cum"],
-  "short": "Remove image and GIF backgrounds with transparency.",
-  "description": "Uses AI matting to remove backgrounds from images and GIFs, outputting transparent results.",
-  "install_msg": "This cog requires rembg, pillow, imageio, and numpy.",
-  "tags": ["image", "background", "transparent", "gif"],
-  "requirements": ["rembg", "pillow", "imageio", "numpy"],
+  "short": "GPU-accelerated background removal for images and GIFs.",
+  "description": "Uses rembg with ONNX GPU acceleration and alpha matting to remove backgrounds from images and GIFs, producing transparent outputs.",
+  "install_msg": "Requires rembg[onnx-gpu], pillow, imageio, and numpy. GPU strongly recommended.",
+  "tags": ["image", "background", "transparent", "gif", "ai"],
+  "requirements": ["rembg[onnx-gpu]", "pillow", "imageio", "numpy"],
   "min_bot_version": "3.5.0",
-  "end_user_data_statement": "This cog does not store user data."
+  "end_user_data_statement": "This cog does not store or persist user data."
 }
