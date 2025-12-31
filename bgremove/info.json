@@ -1,0 +1,11 @@
+{
+  "name": "bgremove",
+  "author": ["cum"],
+  "short": "Remove image and GIF backgrounds with transparency.",
+  "description": "Uses AI matting to remove backgrounds from images and GIFs, outputting transparent results.",
+  "install_msg": "This cog requires rembg, pillow, imageio, and numpy.",
+  "tags": ["image", "background", "transparent", "gif"],
+  "requirements": ["rembg", "pillow", "imageio", "numpy"],
+  "min_bot_version": "3.5.0",
+  "end_user_data_statement": "This cog does not store user data."
+}
