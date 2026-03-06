@@ -1,0 +1,21 @@
+{
+  "author": ["desiderium-wav"],
+  "name": "Uwulock",
+  "short": "UWU-fy user messages",
+  "description": "Commands for converting user messages to UWU speak via webhooks. Allows admins to mark users for automatic UWU-fication with support for bulk operations.",
+  "install_msg": "Uwulock cog loaded successfully.",
+  "end_user_data_statement": "This cog stores user IDs of UWU-locked users per guild in memory. It also maintains a webhook cache for channels. Data is not persisted and is lost on bot restart.",
+  "usage": "Use [p]uwulock <member|all> and [p]unlock <member|all> to manage UWU-fication.",
+  "tags": [
+    "admin",
+    "fun",
+    "moderation",
+    "uwu",
+    "webhook"
+  ],
+  "requirements": ["uwuipy"],
+  "hidden": false,
+  "disabled": false,
+  "min_bot_version": "3.4.0",
+  "max_bot_version": ""
+}
