@@ -1,8 +1,8 @@
 import discord
-from redbot.core import commands, bot
+from redbot.core import commands, bot, Config
 from redbot.core.utils.chat_formatting import bold
 import uwuipy
-import os
+from typing import Optional
 
 # Uwulock cog - handles uwulock and unlock commands with per-guild state
 
@@ -15,9 +15,11 @@ class Uwulock(commands.Cog):
         self.webhook_cache = {}  # Cache for webhooks per channel
         self.uwu = uwuipy.Uwuipy()
         
-        # Log channel for actions
-        _raw_log_id = os.getenv("LOG_CHANNEL_ID")
-        self.log_channel_id = int(_raw_log_id) if _raw_log_id and _raw_log_id.isdigit() else None
+        # Config storage
+        self.config = Config.get_conf(self, identifier=1234567892, force_registration=True)
+        self.config.register_guild(
+            log_channel_id=None
+        )
     
     def get_guild_state(self, guild_id: int) -> set:
         """Get or create the UWU-locked users set for a guild."""
@@ -25,16 +27,17 @@ class Uwulock(commands.Cog):
             self.uwulocked_user_ids[guild_id] = set()
         return self.uwulocked_user_ids[guild_id]
     
-    async def log_action(self, message: str):
-        """Log an action to the log channel if configured."""
-        if self.log_channel_id:
+    async def log_action(self, guild_id: int, message: str):
+        """Log an action to the configured log channel."""
+        log_channel_id = await self.config.guild_from_id(guild_id).log_channel_id()
+        if log_channel_id:
             try:
-                log_channel = self.bot.get_channel(self.log_channel_id)
+                log_channel = self.bot.get_channel(log_channel_id)
                 if log_channel:
                     await log_channel.send(message)
             except Exception:
                 pass
-        print(f"[LOG] {message}")
+        print(f"[UWULOCK LOG - Guild {guild_id}] {message}")
     
     async def apply_to_all_members(self, ctx: commands.Context, action, label: str):
         """Apply an action to all non-bot members in the guild."""
@@ -62,6 +65,65 @@ class Uwulock(commands.Cog):
         
         print("Final count:", count)
         await ctx.send(f"{label} applied to {count} members.")
+    
+    @commands.hybrid_group(name="uwulockcfg", invoke_without_command=True)
+    @commands.admin_or_permissions(administrator=True)
+    @commands.guild_only()
+    async def uwulockcfg(self, ctx: commands.Context):
+        """Uwulock configuration settings."""
+        log_channel_id = await self.config.guild(ctx.guild).log_channel_id()
+        
+        log_channel_str = f"<#{log_channel_id}>" if log_channel_id else "Not set"
+        
+        embed = discord.Embed(
+            title="Uwulock Configuration",
+            description="Current uwulock settings for this server",
+            color=discord.Color.blue()
+        )
+        embed.add_field(name="Log Channel", value=log_channel_str, inline=False)
+        embed.add_field(
+            name="Commands",
+            value=(
+                "`uwulockcfg logchannel <channel>` - Set log channel\n"
+                "`uwulockcfg logchannel clear` - Clear log channel\n"
+                "`uwulock <member|all>` - UWU-lock user(s)\n"
+                "`unlock <member|all>` - Unlock user(s)"
+            ),
+            inline=False
+        )
+        
+        await ctx.send(embed=embed)
+    
+    @uwulockcfg.group(name="logchannel", invoke_without_command=True)
+    @commands.admin_or_permissions(administrator=True)
+    @commands.guild_only()
+    async def uwulockcfg_logchannel_group(self, ctx: commands.Context, channel: Optional[discord.TextChannel] = None):
+        """Set or view the log channel."""
+        if channel is None:
+            # Show current log channel
+            log_channel_id = await self.config.guild(ctx.guild).log_channel_id()
+            if log_channel_id:
+                await ctx.send(f"Current log channel: <#{log_channel_id}>", delete_after=5)
+            else:
+                await ctx.send("No log channel is set.", delete_after=5)
+            return
+        
+        await self.config.guild(ctx.guild).log_channel_id.set(channel.id)
+        await ctx.send(f"✅ Log channel set to {channel.mention}", delete_after=5)
+    
+    @uwulockcfg_logchannel_group.command(name="clear", description="Clear the log channel")
+    @commands.admin_or_permissions(administrator=True)
+    @commands.guild_only()
+    async def uwulockcfg_logchannel_clear(self, ctx: commands.Context):
+        """Clear the log channel setting."""
+        log_channel_id = await self.config.guild(ctx.guild).log_channel_id()
+        
+        if not log_channel_id:
+            await ctx.send("❌ No log channel is currently set.", delete_after=5)
+            return
+        
+        await self.config.guild(ctx.guild).log_channel_id.clear()
+        await ctx.send("✅ Log channel has been cleared.", delete_after=5)
     
     @commands.hybrid_command(name="uwulock", description="UWU-fy a user's messages or all members")
     @commands.admin_or_permissions(administrator=True)
@@ -105,15 +167,19 @@ class Uwulock(commands.Cog):
         """Check if a user is UWU-locked in a guild."""
         return user_id in self.get_guild_state(guild_id)
     
-    async def get_webhook(self, channel: discord.TextChannel) -> discord.Webhook:
+    async def get_webhook(self, channel: discord.TextChannel) -> Optional[discord.Webhook]:
         """Get or create a webhook for the channel."""
-        if channel.id not in self.webhook_cache:
-            webhooks = await channel.webhooks()
-            webhook = discord.utils.get(webhooks, name="UwuFiend")
-            if webhook is None:
-                webhook = await channel.create_webhook(name="UwuFiend")
-            self.webhook_cache[channel.id] = webhook
-        return self.webhook_cache[channel.id]
+        try:
+            if channel.id not in self.webhook_cache:
+                webhooks = await channel.webhooks()
+                webhook = discord.utils.get(webhooks, name="UwuFiend")
+                if webhook is None:
+                    webhook = await channel.create_webhook(name="UwuFiend")
+                self.webhook_cache[channel.id] = webhook
+            return self.webhook_cache[channel.id]
+        except Exception as e:
+            await self.log_action(channel.guild.id, f"Failed to create/get webhook in {channel.name}: {e}")
+            return None
     
     async def uwuify_message(self, message: discord.Message):
         """Convert a message to UWU speak via webhook."""
@@ -122,6 +188,9 @@ class Uwulock(commands.Cog):
             
             channel = message.channel
             webhook = await self.get_webhook(channel)
+            
+            if not webhook:
+                return
             
             uwu_text = self.uwu.uwuify(message.content).strip()
             if len(uwu_text) > 2000:
@@ -134,7 +203,7 @@ class Uwulock(commands.Cog):
             )
         except Exception as e:
             print(f"[UWULOCK ERROR] Failed to uwuify message: {e}")
-            await self.log_action(f"Failed to uwuify message from {message.author.display_name}: {e}")
+            await self.log_action(message.guild.id, f"Failed to uwuify message from {message.author.display_name}: {e}")
 
 async def setup(bot: bot.Red):
     """Load the Uwulock cog."""
