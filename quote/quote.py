@@ -2,7 +2,6 @@ import discord
 from redbot.core import commands, bot, Config
 from PIL import Image, ImageDraw, ImageFont
 import io
-import textwrap
 from datetime import datetime
 from typing import Optional
 
@@ -11,6 +10,7 @@ class Quote(commands.Cog):
     
     def __init__(self, bot: bot.Red):
         self.bot = bot
+        self.quote_authors = {}  # Track {message_id: original_author_id}
         
         # Config storage
         self.config = Config.get_conf(self, identifier=1234567895, force_registration=True)
@@ -33,109 +33,125 @@ class Quote(commands.Cog):
     
     def create_quote_image(
         self,
-        author_name: str,
-        author_avatar: bytes,
         message_content: str,
+        author_name: str,
+        author_username: str,
+        author_avatar: bytes,
         timestamp: datetime,
-        color: discord.Color = None
+        color: discord.Color = None,
+        message_id: int = None
     ) -> io.BytesIO:
         """
-        Create a stylized quote image.
+        Create a stylized quote image matching Discord's "Make it a Quote" style.
         
         Args:
-            author_name: Name of the message author
-            author_avatar: Avatar image bytes
             message_content: The message content to quote
+            author_name: Display name of the message author
+            author_username: Username of the message author
+            author_avatar: Avatar image bytes
             timestamp: When the message was sent
-            color: Color of the accent bar (uses author's color if available)
+            color: Color accent (not prominently used in this style)
+            message_id: Message ID for tracking
         
         Returns:
             BytesIO object containing the quote image
         """
-        # Image dimensions
-        width = 600
-        padding = 20
-        text_width = width - (padding * 2)
+        # Image dimensions - wider format like the reference
+        width = 900
+        height = 600
         
-        # Colors
-        bg_color = (36, 37, 40)  # Dark Discord background
+        # Colors - match Discord dark theme with slight adjustments
+        bg_color = (20, 20, 20)  # Very dark background
         text_color = (220, 221, 222)  # Light text
-        accent_color = (88, 165, 255) if color is None else color.to_rgb()  # Blue accent
+        secondary_text = (120, 120, 120)  # Muted text
         
-        # Load and resize avatar
-        avatar_img = Image.open(io.BytesIO(author_avatar)).convert("RGBA")
-        avatar_size = 50
-        avatar_img = avatar_img.resize((avatar_size, avatar_size), Image.Resampling.LANCZOS)
-        
-        # Create base image
-        img = Image.new("RGB", (width, 100), bg_color)
+        # Create image
+        img = Image.new("RGB", (width, height), bg_color)
         draw = ImageDraw.Draw(img)
         
-        # Try to load a nice font, fall back to default if not available
+        # Load fonts
         try:
-            name_font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 14)
-            content_font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 12)
-            timestamp_font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 10)
+            title_font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 48)
+            author_font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 16)
+            username_font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 13)
+            metadata_font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 12)
         except (OSError, IOError):
-            # Fallback to default font
-            name_font = ImageFont.load_default()
-            content_font = ImageFont.load_default()
-            timestamp_font = ImageFont.load_default()
+            title_font = ImageFont.load_default()
+            author_font = ImageFont.load_default()
+            username_font = ImageFont.load_default()
+            metadata_font = ImageFont.load_default()
         
-        # Wrap text
-        wrapped_lines = []
+        # Load and resize avatar to larger size
+        avatar_img = Image.open(io.BytesIO(author_avatar)).convert("RGBA")
+        avatar_size = 200
+        avatar_img = avatar_img.resize((avatar_size, avatar_size), Image.Resampling.LANCZOS)
+        
+        # Add slight transparency/vignette effect to avatar
+        avatar_img = avatar_img.convert("RGBA")
+        alpha = avatar_img.split()[3]
+        alpha = alpha.point(lambda p: int(p * 0.7))
+        avatar_img.putalpha(alpha)
+        
+        # Position avatar on left side
+        avatar_x = 50
+        avatar_y = (height - avatar_size) // 2
+        img.paste(avatar_img, (avatar_x, avatar_y), avatar_img)
+        
+        # Message content positioning - right side
+        content_x = avatar_x + avatar_size + 80
+        content_y = 150
+        
+        # Wrap and draw the main message content
+        # Split into lines for wrapping
+        max_width = width - content_x - 40
         words = message_content.split()
+        lines = []
         current_line = ""
         
         for word in words:
             test_line = f"{current_line} {word}".strip()
-            bbox = draw.textbbox((0, 0), test_line, font=content_font)
-            if bbox[2] - bbox[0] > text_width - 20:  # Account for avatar space
-                if current_line:
-                    wrapped_lines.append(current_line)
+            bbox = draw.textbbox((0, 0), test_line, font=title_font)
+            line_width = bbox[2] - bbox[0]
+            
+            if line_width > max_width and current_line:
+                lines.append(current_line)
                 current_line = word
             else:
                 current_line = test_line
         
         if current_line:
-            wrapped_lines.append(current_line)
+            lines.append(current_line)
         
-        # Limit to reasonable number of lines
-        wrapped_lines = wrapped_lines[:10]
-        
-        # Calculate final image height
-        line_height = 18
-        content_height = len(wrapped_lines) * line_height + 10
-        metadata_height = 25
-        total_height = padding + avatar_size + padding + content_height + metadata_height + padding
-        
-        # Recreate image with proper height
-        img = Image.new("RGB", (width, total_height), bg_color)
-        draw = ImageDraw.Draw(img)
-        
-        # Draw accent bar on the left
-        bar_width = 4
-        draw.rectangle([(0, 0), (bar_width, total_height)], fill=accent_color)
-        
-        # Draw avatar
-        avatar_x = padding
-        avatar_y = padding
-        img.paste(avatar_img, (avatar_x, avatar_y), avatar_img)
-        
-        # Draw author name
-        name_x = avatar_x + avatar_size + padding
-        name_y = avatar_y
-        draw.text((name_x, name_y), author_name, fill=text_color, font=name_font)
-        
-        # Draw timestamp below name
-        timestamp_str = timestamp.strftime("%m/%d/%Y %I:%M %p")
-        draw.text((name_x, name_y + 18), timestamp_str, fill=(120, 120, 120), font=timestamp_font)
+        # Limit lines to prevent overflow
+        lines = lines[:6]
         
         # Draw message content
-        content_y = avatar_y + avatar_size + padding
-        for i, line in enumerate(wrapped_lines):
-            y_pos = content_y + (i * line_height)
-            draw.text((padding + 10, y_pos), line, fill=text_color, font=content_font)
+        for i, line in enumerate(lines):
+            y = content_y + (i * 60)
+            draw.text((content_x, y), line, fill=text_color, font=title_font)
+        
+        # Draw author info below message
+        author_y = content_y + (len(lines) * 60) + 40
+        
+        # Author name with custom styling
+        draw.text((content_x, author_y), f"- {author_name}", fill=text_color, font=author_font)
+        
+        # Username below author name
+        draw.text((content_x, author_y + 28), f"@{author_username}", fill=secondary_text, font=username_font)
+        
+        # Timestamp in bottom right
+        timestamp_str = timestamp.strftime("%I:%M %p").lstrip("0")
+        bbox = draw.textbbox((0, 0), timestamp_str, font=metadata_font)
+        timestamp_width = bbox[2] - bbox[0]
+        draw.text((width - timestamp_width - 30, height - 35), timestamp_str, fill=secondary_text, font=metadata_font)
+        
+        # Message ID in bottom right (like "Make it a Quote#6660")
+        if message_id:
+            msg_id_short = str(message_id)[-4:]  # Last 4 digits
+            id_text = f"Make it a Quote#{msg_id_short}"
+            bbox = draw.textbbox((0, 0), id_text, font=metadata_font)
+            id_width = bbox[2] - bbox[0]
+            draw.text((width - id_width - 30, height - 55), id_text, fill=secondary_text, font=metadata_font)
         
         # Convert to bytes
         buf = io.BytesIO()
@@ -180,7 +196,6 @@ class Quote(commands.Cog):
     async def quotecfg_quoteschannel_group(self, ctx: commands.Context, channel: Optional[discord.TextChannel] = None):
         """Set or view the quotes channel."""
         if channel is None:
-            # Show current quotes channel
             quotes_channel_id = await self.config.guild(ctx.guild).quotes_channel_id()
             if quotes_channel_id:
                 await ctx.send(f"Current quotes channel: <#{quotes_channel_id}>", delete_after=5)
@@ -213,7 +228,6 @@ class Quote(commands.Cog):
     async def quotecfg_logchannel_group(self, ctx: commands.Context, channel: Optional[discord.TextChannel] = None):
         """Set or view the log channel."""
         if channel is None:
-            # Show current log channel
             log_channel_id = await self.config.guild(ctx.guild).log_channel_id()
             if log_channel_id:
                 await ctx.send(f"Current log channel: <#{log_channel_id}>", delete_after=5)
@@ -238,6 +252,49 @@ class Quote(commands.Cog):
         await self.config.guild(ctx.guild).log_channel_id.clear()
         await ctx.send("✅ Log channel has been cleared.", delete_after=5)
     
+    class QuoteView(discord.ui.View):
+        """Interactive view for quote actions."""
+        
+        def __init__(self, original_message: discord.Message, quote_sender: discord.User, cog):
+            super().__init__(timeout=None)
+            self.original_message = original_message
+            self.quote_sender = quote_sender
+            self.cog = cog
+        
+        @discord.ui.button(label="Jump to original message", style=discord.ButtonStyle.link)
+        async def jump_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+            """Button to jump to original message."""
+            button.url = self.original_message.jump_url
+        
+        @discord.ui.button(label="Remove my Quote", style=discord.ButtonStyle.danger, emoji="🗑️")
+        async def remove_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+            """Button to remove the quote."""
+            # Only allow the quote sender to remove it
+            if interaction.user.id != self.quote_sender.id:
+                await interaction.response.send_message(
+                    "❌ Only the user who created this quote can remove it.",
+                    ephemeral=True
+                )
+                return
+            
+            try:
+                # Delete the quote message
+                await interaction.message.delete()
+                await self.cog.log_action(
+                    interaction.guild.id,
+                    f"Quote removed by {interaction.user.display_name}"
+                )
+            except discord.Forbidden:
+                await interaction.response.send_message(
+                    "❌ I don't have permission to delete this message.",
+                    ephemeral=True
+                )
+            except Exception as e:
+                await interaction.response.send_message(
+                    f"❌ Failed to remove quote: {e}",
+                    ephemeral=True
+                )
+    
     @commands.hybrid_command(name="quote", aliases=["q"], description="Quote a message in a stylized format")
     async def quote(self, ctx: commands.Context, message: Optional[discord.Message] = None):
         """
@@ -248,7 +305,6 @@ class Quote(commands.Cog):
         """
         # Get the message to quote
         if message is None:
-            # Check if this is a reply
             if ctx.message.reference:
                 try:
                     message = await ctx.channel.fetch_message(ctx.message.reference.message_id)
@@ -275,22 +331,17 @@ class Quote(commands.Cog):
         try:
             avatar_bytes = await message.author.display_avatar.read()
         except Exception:
-            # Fallback if avatar can't be fetched
             avatar_bytes = await self.bot.user.display_avatar.read()
-        
-        # Get author's color from roles
-        author_color = None
-        if isinstance(message.author, discord.Member) and message.author.color:
-            author_color = message.author.color
         
         # Generate quote image
         try:
             quote_image = self.create_quote_image(
-                author_name=message.author.display_name,
-                author_avatar=avatar_bytes,
                 message_content=quote_content,
+                author_name=message.author.display_name,
+                author_username=message.author.name,
+                author_avatar=avatar_bytes,
                 timestamp=message.created_at,
-                color=author_color
+                message_id=message.id
             )
         except Exception as e:
             await ctx.send(f"❌ Failed to create quote image: {e}", delete_after=5)
@@ -299,29 +350,26 @@ class Quote(commands.Cog):
         # Create the file
         quote_file = discord.File(quote_image, filename="quote.png")
         
-        # Prepare quote info embed for the quotes channel
-        embed = None
-        quotes_channel_id = await self.config.guild(ctx.guild).quotes_channel_id()
-        if quotes_channel_id:
-            embed = discord.Embed(
-                description=f"**{message.author.display_name}** in {message.channel.mention}",
-                color=author_color or discord.Color.blue(),
-                timestamp=message.created_at
-            )
-            embed.set_footer(text=f"Original message ID: {message.id}")
+        # Create view with buttons
+        view = self.QuoteView(message, ctx.author, self)
         
-        # Send to current channel
+        # Send to current channel with view
         try:
-            await ctx.send(
+            sent_message = await ctx.send(
                 file=quote_file,
+                view=view,
                 reference=ctx.message,
                 mention_author=False
             )
+            
+            # Store author info for tracking
+            self.quote_authors[sent_message.id] = ctx.author.id
         except Exception as e:
             await ctx.send(f"❌ Failed to send quote: {e}", delete_after=5)
             return
         
         # Send to quotes channel if configured
+        quotes_channel_id = await self.config.guild(ctx.guild).quotes_channel_id()
         if quotes_channel_id:
             try:
                 quotes_channel = self.bot.get_channel(quotes_channel_id)
@@ -330,10 +378,22 @@ class Quote(commands.Cog):
                     quote_image.seek(0)
                     quote_file_archive = discord.File(quote_image, filename="quote.png")
                     
-                    await quotes_channel.send(
-                        embed=embed,
-                        file=quote_file_archive
+                    # Create archive view (no remove button in archive)
+                    archive_view = discord.ui.View()
+                    archive_view.add_item(
+                        discord.ui.Button(
+                            label="Jump to original message",
+                            style=discord.ButtonStyle.link,
+                            url=message.jump_url
+                        )
                     )
+                    
+                    # Send to archive
+                    await quotes_channel.send(
+                        file=quote_file_archive,
+                        view=archive_view
+                    )
+                    
                     await self.log_action(
                         ctx.guild.id,
                         f"Quote created by {ctx.author.display_name} from {message.author.display_name}'s message"
