@@ -1,0 +1,20 @@
+{
+  "author": ["desiderium-wav"],
+  "name": "Stalk",
+  "short": "User stalking and message monitoring",
+  "description": "Commands for monitoring and stalking user messages. Allows admins to mark users for automatic message deletion with support for bulk operations.",
+  "install_msg": "Stalk cog loaded successfully.",
+  "end_user_data_statement": "This cog stores user IDs of stalked users per guild in memory. Data is not persisted and is lost on bot restart.",
+  "usage": "Use [p]startstalk <member|all> and [p]stopstalk <member|all> to manage stalking.",
+  "tags": [
+    "admin",
+    "moderation",
+    "stalking",
+    "monitoring"
+  ],
+  "requirements": [],
+  "hidden": false,
+  "disabled": false,
+  "min_bot_version": "3.4.0",
+  "max_bot_version": ""
+}
