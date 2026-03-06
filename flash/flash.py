@@ -1,7 +1,7 @@
 import discord
-from redbot.core import commands, bot
+from redbot.core import commands, bot, Config
 import asyncio
-from typing import Optional, Dict, Set
+from typing import Optional
 import os
 
 # Flash cog - 5-minute flash message handler with auto-delete and spoiler enforcement
@@ -12,39 +12,32 @@ class Flash(commands.Cog):
     def __init__(self, bot: bot.Red):
         self.bot = bot
         
-        # Per-guild configuration: {guild_id: {"enabled": bool, "channel_id": int, "role_id": int}}
-        self.flash_config = {}
-        
         # Per-message timers: {message_id: asyncio.Task}
         self.message_timers = {}
         
         # Webhook cache: {channel_id: webhook}
         self.webhook_cache = {}
         
-        # Log channel for actions
-        _raw_log_id = os.getenv("LOG_CHANNEL_ID")
-        self.log_channel_id = int(_raw_log_id) if _raw_log_id and _raw_log_id.isdigit() else None
+        # Config storage
+        self.config = Config.get_conf(self, identifier=1234567893, force_registration=True)
+        self.config.register_guild(
+            enabled=False,
+            channel_id=None,
+            role_id=None,
+            log_channel_id=None
+        )
     
-    def get_guild_config(self, guild_id: int) -> dict:
-        """Get or create configuration for a guild."""
-        if guild_id not in self.flash_config:
-            self.flash_config[guild_id] = {
-                "enabled": False,
-                "channel_id": None,
-                "role_id": None
-            }
-        return self.flash_config[guild_id]
-    
-    async def log_action(self, message: str):
-        """Log an action to the log channel if configured."""
-        if self.log_channel_id:
+    async def log_action(self, guild_id: int, message: str):
+        """Log an action to the configured log channel."""
+        log_channel_id = await self.config.guild_from_id(guild_id).log_channel_id()
+        if log_channel_id:
             try:
-                log_channel = self.bot.get_channel(self.log_channel_id)
+                log_channel = self.bot.get_channel(log_channel_id)
                 if log_channel:
                     await log_channel.send(message)
             except Exception:
                 pass
-        print(f"[FLASH LOG] {message}")
+        print(f"[FLASH LOG - Guild {guild_id}] {message}")
     
     def message_has_image_or_video(self, msg: discord.Message) -> bool:
         """Check if message has image or video attachments (excluding gifs, stickers, emojis)."""
@@ -85,7 +78,7 @@ class Flash(commands.Cog):
                 self.webhook_cache[channel.id] = webhook
             return self.webhook_cache[channel.id]
         except Exception as e:
-            await self.log_action(f"Failed to create/get webhook in {channel.name}: {e}")
+            await self.log_action(channel.guild.id, f"Failed to create/get webhook in {channel.name}: {e}")
             return None
     
     async def repost_media_with_spoiler(self, message: discord.Message):
@@ -117,7 +110,7 @@ class Flash(commands.Cog):
                         filename=spoiler_filename
                     ))
                 except Exception as e:
-                    await self.log_action(f"Failed to read attachment {attachment.filename}: {e}")
+                    await self.log_action(message.guild.id, f"Failed to read attachment {attachment.filename}: {e}")
             
             if files:
                 await webhook.send(
@@ -126,7 +119,7 @@ class Flash(commands.Cog):
                     avatar_url=message.author.display_avatar.url,
                 )
         except Exception as e:
-            await self.log_action(f"Failed to repost media with spoiler: {e}")
+            await self.log_action(message.guild.id, f"Failed to repost media with spoiler: {e}")
     
     async def delete_message_after_timer(self, message: discord.Message, delay: int = 300):
         """Delete a message after the specified delay (default 5 minutes = 300 seconds)."""
@@ -135,7 +128,7 @@ class Flash(commands.Cog):
             await message.delete()
             if message.id in self.message_timers:
                 del self.message_timers[message.id]
-            await self.log_action(f"Auto-deleted message {message.id} from {message.author.display_name}")
+            await self.log_action(message.guild.id, f"Auto-deleted message {message.id} from {message.author.display_name}")
         except asyncio.CancelledError:
             pass
         except discord.NotFound:
@@ -143,13 +136,13 @@ class Flash(commands.Cog):
             if message.id in self.message_timers:
                 del self.message_timers[message.id]
         except Exception as e:
-            await self.log_action(f"Error deleting message {message.id}: {e}")
+            await self.log_action(message.guild.id, f"Error deleting message {message.id}: {e}")
             if message.id in self.message_timers:
                 del self.message_timers[message.id]
     
     async def handle_flash_message(self, message: discord.Message):
         """Handle a message in the flash channel."""
-        config = self.get_guild_config(message.guild.id)
+        config = await self.config.guild(message.guild).all()
         
         # Check if flash is enabled and this is the flash channel
         if not config["enabled"] or config["channel_id"] != message.channel.id:
@@ -173,7 +166,7 @@ class Flash(commands.Cog):
                     if role:
                         await message.reply(f"{role.mention}", mention_author=False)
                 except Exception as e:
-                    await self.log_action(f"Failed to ping role: {e}")
+                    await self.log_action(message.guild.id, f"Failed to ping role: {e}")
         
         # Create timer for message deletion
         task = asyncio.create_task(self.delete_message_after_timer(message))
@@ -185,7 +178,7 @@ class Flash(commands.Cog):
         if message.guild is None:
             return
         
-        config = self.get_guild_config(message.guild.id)
+        config = await self.config.guild(message.guild).all()
         
         # Check if flash is enabled and this is the flash channel
         if config["enabled"] and config["channel_id"] == message.channel.id:
@@ -196,12 +189,13 @@ class Flash(commands.Cog):
     @commands.guild_only()
     async def flashset(self, ctx: commands.Context):
         """Flash settings management. Use subcommands to configure."""
-        config = self.get_guild_config(ctx.guild.id)
+        config = await self.config.guild(ctx.guild).all()
         
         # Show current configuration
         enabled_status = "✅ Enabled" if config["enabled"] else "❌ Disabled"
         channel_str = f"<#{config['channel_id']}>" if config["channel_id"] else "Not set"
         role_str = f"<@&{config['role_id']}>" if config["role_id"] else "Not set"
+        log_channel_str = f"<#{config['log_channel_id']}>" if config["log_channel_id"] else "Not set"
         
         embed = discord.Embed(
             title="Flash Configuration",
@@ -211,6 +205,7 @@ class Flash(commands.Cog):
         embed.add_field(name="Status", value=enabled_status, inline=False)
         embed.add_field(name="Flash Channel", value=channel_str, inline=False)
         embed.add_field(name="Ping Role", value=role_str, inline=False)
+        embed.add_field(name="Log Channel", value=log_channel_str, inline=False)
         embed.add_field(
             name="Commands",
             value=(
@@ -220,6 +215,8 @@ class Flash(commands.Cog):
                 "`flashset channel clear` - Clear flash channel\n"
                 "`flashset role <role>` - Set ping role\n"
                 "`flashset role clear` - Clear ping role\n"
+                "`flashset logchannel <channel>` - Set log channel\n"
+                "`flashset logchannel clear` - Clear log channel\n"
                 "`flashset clear` - Clear all settings"
             ),
             inline=False
@@ -232,7 +229,7 @@ class Flash(commands.Cog):
     @commands.guild_only()
     async def flashset_enable(self, ctx: commands.Context):
         """Enable flash for this server."""
-        config = self.get_guild_config(ctx.guild.id)
+        config = await self.config.guild(ctx.guild).all()
         
         if config["enabled"]:
             await ctx.send("⚠️ Flash is already enabled.", delete_after=5)
@@ -242,103 +239,133 @@ class Flash(commands.Cog):
             await ctx.send("❌ Please set a flash channel first with `flashset channel <channel>`", delete_after=5)
             return
         
-        config["enabled"] = True
+        await self.config.guild(ctx.guild).enabled.set(True)
         await ctx.send("✅ Flash has been enabled.", delete_after=5)
-        await self.log_action(f"Flash enabled in guild {ctx.guild.name} ({ctx.guild.id})")
+        await self.log_action(ctx.guild.id, f"Flash enabled in guild {ctx.guild.name}")
     
     @flashset.command(name="disable", description="Disable flash for this server")
     @commands.admin_or_permissions(administrator=True)
     @commands.guild_only()
     async def flashset_disable(self, ctx: commands.Context):
         """Disable flash for this server."""
-        config = self.get_guild_config(ctx.guild.id)
+        config = await self.config.guild(ctx.guild).all()
         
         if not config["enabled"]:
             await ctx.send("⚠️ Flash is already disabled.", delete_after=5)
             return
         
-        config["enabled"] = False
+        await self.config.guild(ctx.guild).enabled.set(False)
         await ctx.send("⛔ Flash has been disabled.", delete_after=5)
-        await self.log_action(f"Flash disabled in guild {ctx.guild.name} ({ctx.guild.id})")
+        await self.log_action(ctx.guild.id, f"Flash disabled in guild {ctx.guild.name}")
     
     @flashset.group(name="channel", invoke_without_command=True)
     @commands.admin_or_permissions(administrator=True)
     @commands.guild_only()
     async def flashset_channel_group(self, ctx: commands.Context, channel: Optional[discord.TextChannel] = None):
         """Set or view the flash channel."""
+        config = await self.config.guild(ctx.guild).all()
+        
         if channel is None:
             # Show current channel
-            config = self.get_guild_config(ctx.guild.id)
             if config["channel_id"]:
                 await ctx.send(f"Current flash channel: <#{config['channel_id']}>", delete_after=5)
             else:
                 await ctx.send("No flash channel is set.", delete_after=5)
             return
         
-        config = self.get_guild_config(ctx.guild.id)
-        config["channel_id"] = channel.id
+        await self.config.guild(ctx.guild).channel_id.set(channel.id)
         await ctx.send(f"✅ Flash channel set to {channel.mention}", delete_after=5)
-        await self.log_action(f"Flash channel set to {channel.name} in guild {ctx.guild.name}")
+        await self.log_action(ctx.guild.id, f"Flash channel set to {channel.name}")
     
     @flashset_channel_group.command(name="clear", description="Clear the flash channel")
     @commands.admin_or_permissions(administrator=True)
     @commands.guild_only()
     async def flashset_channel_clear(self, ctx: commands.Context):
         """Clear the flash channel setting."""
-        config = self.get_guild_config(ctx.guild.id)
+        config = await self.config.guild(ctx.guild).all()
         
         if not config["channel_id"]:
             await ctx.send("❌ No flash channel is currently set.", delete_after=5)
             return
         
-        config["channel_id"] = None
+        await self.config.guild(ctx.guild).channel_id.clear()
         await ctx.send("✅ Flash channel has been cleared.", delete_after=5)
-        await self.log_action(f"Flash channel cleared in guild {ctx.guild.name}")
+        await self.log_action(ctx.guild.id, f"Flash channel cleared")
     
     @flashset.group(name="role", invoke_without_command=True)
     @commands.admin_or_permissions(administrator=True)
     @commands.guild_only()
     async def flashset_role_group(self, ctx: commands.Context, role: Optional[discord.Role] = None):
         """Set or view the ping role for image/video messages."""
+        config = await self.config.guild(ctx.guild).all()
+        
         if role is None:
             # Show current role
-            config = self.get_guild_config(ctx.guild.id)
             if config["role_id"]:
                 await ctx.send(f"Current ping role: <@&{config['role_id']}>", delete_after=5)
             else:
                 await ctx.send("No ping role is set.", delete_after=5)
             return
         
-        config = self.get_guild_config(ctx.guild.id)
-        config["role_id"] = role.id
+        await self.config.guild(ctx.guild).role_id.set(role.id)
         await ctx.send(f"✅ Ping role set to {role.mention}", delete_after=5)
-        await self.log_action(f"Flash ping role set to {role.name} in guild {ctx.guild.name}")
+        await self.log_action(ctx.guild.id, f"Flash ping role set to {role.name}")
     
     @flashset_role_group.command(name="clear", description="Clear the ping role")
     @commands.admin_or_permissions(administrator=True)
     @commands.guild_only()
     async def flashset_role_clear(self, ctx: commands.Context):
         """Clear the ping role setting."""
-        config = self.get_guild_config(ctx.guild.id)
+        config = await self.config.guild(ctx.guild).all()
         
         if not config["role_id"]:
             await ctx.send("❌ No ping role is currently set.", delete_after=5)
             return
         
-        config["role_id"] = None
+        await self.config.guild(ctx.guild).role_id.clear()
         await ctx.send("✅ Ping role has been cleared.", delete_after=5)
-        await self.log_action(f"Flash ping role cleared in guild {ctx.guild.name}")
+        await self.log_action(ctx.guild.id, f"Flash ping role cleared")
+    
+    @flashset.group(name="logchannel", invoke_without_command=True)
+    @commands.admin_or_permissions(administrator=True)
+    @commands.guild_only()
+    async def flashset_logchannel_group(self, ctx: commands.Context, channel: Optional[discord.TextChannel] = None):
+        """Set or view the log channel."""
+        config = await self.config.guild(ctx.guild).all()
+        
+        if channel is None:
+            # Show current log channel
+            if config["log_channel_id"]:
+                await ctx.send(f"Current log channel: <#{config['log_channel_id']}>", delete_after=5)
+            else:
+                await ctx.send("No log channel is set.", delete_after=5)
+            return
+        
+        await self.config.guild(ctx.guild).log_channel_id.set(channel.id)
+        await ctx.send(f"✅ Log channel set to {channel.mention}", delete_after=5)
+    
+    @flashset_logchannel_group.command(name="clear", description="Clear the log channel")
+    @commands.admin_or_permissions(administrator=True)
+    @commands.guild_only()
+    async def flashset_logchannel_clear(self, ctx: commands.Context):
+        """Clear the log channel setting."""
+        config = await self.config.guild(ctx.guild).all()
+        
+        if not config["log_channel_id"]:
+            await ctx.send("❌ No log channel is currently set.", delete_after=5)
+            return
+        
+        await self.config.guild(ctx.guild).log_channel_id.clear()
+        await ctx.send("✅ Log channel has been cleared.", delete_after=5)
     
     @flashset.command(name="clear", description="Clear all flash settings for this server")
     @commands.admin_or_permissions(administrator=True)
     @commands.guild_only()
     async def flashset_clear(self, ctx: commands.Context):
         """Clear all flash settings for this server."""
-        if ctx.guild.id in self.flash_config:
-            del self.flash_config[ctx.guild.id]
-        
+        await self.config.guild(ctx.guild).clear()
         await ctx.send("✅ All flash settings have been cleared.", delete_after=5)
-        await self.log_action(f"All flash settings cleared in guild {ctx.guild.name}")
+        await self.log_action(ctx.guild.id, f"All flash settings cleared")
     
     async def cog_unload(self):
         """Cancel all pending message deletion tasks when cog unloads."""
