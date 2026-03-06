@@ -1,17 +1,18 @@
 {
   "author": ["desiderium-wav"],
   "name": "Quote",
-  "short": "Quote messages in a stylized format with optional archive channel",
-  "description": "Capture and quote messages in a stylized format similar to Discord's 'Make it a Quote' bot. Reply to a message with the quote command to create a formatted quote with the original sender's information, timestamp, and an embedded image showing the message. Quotes can be automatically sent to a configured archive channel.",
+  "short": "Quote messages in stylized format with interactive buttons",
+  "description": "Capture and quote messages in a stylized format matching Discord's 'Make it a Quote' bot aesthetic. Creates beautiful quote images with the message, author info, and timestamp. Includes interactive buttons to jump to the original message and remove quotes. Quotes can be automatically archived to a configured channel.",
   "install_msg": "Quote cog loaded successfully. Use [p]quote or [p]q to quote messages. Use [p]quotecfg to configure.",
-  "end_user_data_statement": "This cog stores per-guild configuration (quotes channel ID, log channel ID) for quote archiving. Quotes are not persisted - they are generated on-demand.",
-  "usage": "Reply to a message with [p]quote or [p]q to create a styled quote. Configure with [p]quotecfg.",
+  "end_user_data_statement": "This cog stores per-guild configuration (quotes channel ID, log channel ID) for quote archiving. Quote ownership is tracked in memory only. Quotes are not persisted - they are generated on-demand.",
+  "usage": "Reply to a message with [p]quote or [p]q to create a styled quote with interactive buttons.",
   "tags": [
     "utility",
     "messages",
     "quote",
     "fun",
-    "archive"
+    "archive",
+    "interactive"
   ],
   "requirements": ["pillow"],
   "hidden": false,
