@@ -1,7 +1,7 @@
 import discord
-from redbot.core import commands, bot
+from redbot.core import commands, bot, Config
 from redbot.core.utils.chat_formatting import bold
-import os
+from typing import Optional
 
 # Stalk cog - handles startstalk and stopstalk commands with per-guild state
 
@@ -12,9 +12,11 @@ class Stalk(commands.Cog):
         self.bot = bot
         self.stalked_user_ids = {}  # Dict[guild_id, Set[user_id]]
         
-        # Log channel for actions
-        _raw_log_id = os.getenv("LOG_CHANNEL_ID")
-        self.log_channel_id = int(_raw_log_id) if _raw_log_id and _raw_log_id.isdigit() else None
+        # Config storage
+        self.config = Config.get_conf(self, identifier=1234567891, force_registration=True)
+        self.config.register_guild(
+            log_channel_id=None
+        )
     
     def get_guild_state(self, guild_id: int) -> set:
         """Get or create the stalked users set for a guild."""
@@ -22,16 +24,17 @@ class Stalk(commands.Cog):
             self.stalked_user_ids[guild_id] = set()
         return self.stalked_user_ids[guild_id]
     
-    async def log_action(self, message: str):
-        """Log an action to the log channel if configured."""
-        if self.log_channel_id:
+    async def log_action(self, guild_id: int, message: str):
+        """Log an action to the configured log channel."""
+        log_channel_id = await self.config.guild_from_id(guild_id).log_channel_id()
+        if log_channel_id:
             try:
-                log_channel = self.bot.get_channel(self.log_channel_id)
+                log_channel = self.bot.get_channel(log_channel_id)
                 if log_channel:
                     await log_channel.send(message)
             except Exception:
                 pass
-        print(f"[LOG] {message}")
+        print(f"[STALK LOG - Guild {guild_id}] {message}")
     
     async def apply_to_all_members(self, ctx: commands.Context, action, label: str):
         """Apply an action to all non-bot members in the guild."""
@@ -60,15 +63,64 @@ class Stalk(commands.Cog):
         print("Final count:", count)
         await ctx.send(f"{label} applied to {count} members.")
     
-    @commands.hybrid_group(name="stalk", invoke_without_command=True)
+    @commands.hybrid_group(name="stalkcfg", invoke_without_command=True)
     @commands.admin_or_permissions(administrator=True)
-    async def stalk_group(self, ctx: commands.Context, member: discord.Member = None):
-        """Stalk commands. Use 'startstalk' to begin stalking."""
-        if member:
-            self.get_guild_state(ctx.guild.id).add(member.id)
-            await ctx.send(f"Started stalking {member.mention}.")
-        else:
-            await ctx.send_help(ctx.command)
+    @commands.guild_only()
+    async def stalkcfg(self, ctx: commands.Context):
+        """Stalk configuration settings."""
+        log_channel_id = await self.config.guild(ctx.guild).log_channel_id()
+        
+        log_channel_str = f"<#{log_channel_id}>" if log_channel_id else "Not set"
+        
+        embed = discord.Embed(
+            title="Stalk Configuration",
+            description="Current stalk settings for this server",
+            color=discord.Color.blue()
+        )
+        embed.add_field(name="Log Channel", value=log_channel_str, inline=False)
+        embed.add_field(
+            name="Commands",
+            value=(
+                "`stalkcfg logchannel <channel>` - Set log channel\n"
+                "`stalkcfg logchannel clear` - Clear log channel\n"
+                "`startstalk <member|all>` - Start stalking\n"
+                "`stopstalk <member|all>` - Stop stalking"
+            ),
+            inline=False
+        )
+        
+        await ctx.send(embed=embed)
+    
+    @stalkcfg.group(name="logchannel", invoke_without_command=True)
+    @commands.admin_or_permissions(administrator=True)
+    @commands.guild_only()
+    async def stalkcfg_logchannel_group(self, ctx: commands.Context, channel: Optional[discord.TextChannel] = None):
+        """Set or view the log channel."""
+        if channel is None:
+            # Show current log channel
+            log_channel_id = await self.config.guild(ctx.guild).log_channel_id()
+            if log_channel_id:
+                await ctx.send(f"Current log channel: <#{log_channel_id}>", delete_after=5)
+            else:
+                await ctx.send("No log channel is set.", delete_after=5)
+            return
+        
+        await self.config.guild(ctx.guild).log_channel_id.set(channel.id)
+        await ctx.send(f"✅ Log channel set to {channel.mention}", delete_after=5)
+    
+    @stalkcfg_logchannel_group.command(name="clear", description="Clear the log channel")
+    @commands.admin_or_permissions(administrator=True)
+    @commands.guild_only()
+    async def stalkcfg_logchannel_clear(self, ctx: commands.Context):
+        """Clear the log channel setting."""
+        log_channel_id = await self.config.guild(ctx.guild).log_channel_id()
+        
+        if not log_channel_id:
+            await ctx.send("❌ No log channel is currently set.", delete_after=5)
+            return
+        
+        await self.config.guild(ctx.guild).log_channel_id.clear()
+        await ctx.send("✅ Log channel has been cleared.", delete_after=5)
     
     @commands.hybrid_command(name="startstalk", description="Start stalking a user or all members")
     @commands.admin_or_permissions(administrator=True)
