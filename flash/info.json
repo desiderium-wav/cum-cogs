@@ -1,12 +1,22 @@
 {
   "author": ["desiderium-wav"],
-  "install_msg": "Thanks for installing the Flash cog! Use `[p]flashset channel #channel` and `[p]flashset role @role` to configure.",
   "name": "Flash",
-  "short": "Temporary flash batch handler.",
-  "description": "Handles temporary media batches in a channel with automatic spoiler enforcement and batch deletion.",
+  "short": "5-minute flash message handler with auto-delete and spoiler enforcement",
+  "description": "Automatically deletes messages after 5 minutes and applies spoilers to media. When image/video messages are detected, the bot reposts them with spoiler tags via webhook and pings a designated role. Non-image messages are silently deleted after 5 minutes.",
+  "install_msg": "Flash cog loaded successfully. Use [p]flashset to configure.",
+  "end_user_data_statement": "This cog stores guild configuration (channel ID, role ID, enabled status) and maintains temporary timers for messages. Message timers are not persisted across restarts. Configuration data is stored per-guild in memory.",
+  "usage": "Use [p]flashset enable/disable to control the feature, [p]flashset_channel <channel> to set the flash channel, [p]flashset_role <role> to set the ping role, and other subcommands to configure.",
+  "tags": [
+    "admin",
+    "moderation",
+    "auto-delete",
+    "media",
+    "spoiler",
+    "webhook"
+  ],
   "requirements": [],
-  "tags": ["media", "flash", "spoiler"],
-  "min_bot_version": "3.4.0",
   "hidden": false,
-  "disabled": false
+  "disabled": false,
+  "min_bot_version": "3.4.0",
+  "max_bot_version": ""
 }
