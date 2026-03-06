@@ -1,0 +1,21 @@
+{
+  "author": ["desiderium-wav"],
+  "name": "Purify",
+  "short": "Message purification and bot control",
+  "description": "Admin management commands for message purification and bot control. Includes kill switch, manual purify, and auto-purify cycle management. Purifies messages without images or reactions >= 3.",
+  "install_msg": "Purify cog loaded successfully.",
+  "end_user_data_statement": "This cog does not store any persistent end user data.",
+  "usage": "Use [p]kill, [p]revive, [p]purify, [p]startpurify, [p]stoppurify for management.",
+  "tags": [
+    "admin",
+    "moderation",
+    "purify",
+    "messages",
+    "auto-moderation"
+  ],
+  "requirements": [],
+  "hidden": false,
+  "disabled": false,
+  "min_bot_version": "3.4.0",
+  "max_bot_version": ""
+}
