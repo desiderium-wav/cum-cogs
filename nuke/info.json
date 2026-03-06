@@ -1,0 +1,21 @@
+{
+  "author": ["desiderium-wav"],
+  "name": "Nuke",
+  "short": "Server reset command (owner only)",
+  "description": "Owner-only dangerous command for resetting a server. Deletes all channels and non-admin roles while preserving admin roles and members. Includes confirmation prompt.",
+  "install_msg": "Nuke cog loaded successfully. WARNING: This cog provides owner-only destructive commands.",
+  "end_user_data_statement": "This cog does not store any end user data.",
+  "usage": "Use [p]nuke in a server to trigger a server reset (owner only, requires confirmation).",
+  "tags": [
+    "owner",
+    "dangerous",
+    "admin",
+    "moderation",
+    "server-management"
+  ],
+  "requirements": [],
+  "hidden": true,
+  "disabled": false,
+  "min_bot_version": "3.4.0",
+  "max_bot_version": ""
+}
