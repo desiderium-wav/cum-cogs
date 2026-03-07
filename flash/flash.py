@@ -81,45 +81,53 @@ class Flash(commands.Cog):
             await self.log_action(channel.guild.id, f"Failed to create/get webhook in {channel.name}: {e}")
             return None
     
-    async def repost_media_with_spoiler(self, message: discord.Message):
-        """Repost message media with spoiler tags via webhook."""
+    async def repost_media_with_spoiler(self, message: discord.Message) -> Optional[discord.Message]:
+
         try:
-            channel = message.channel
-            webhook = await self.get_webhook(channel)
-            
+            webhook = await self.get_webhook(message.channel)
             if not webhook:
-                return
-            
-            # Prepare files with spoiler flag
+                return None
+
             files = []
+
             for attachment in message.attachments:
-                # Only repost images and videos (excluding gifs)
-                if not self.message_has_image_or_video(message):
+
+                filename = attachment.filename.lower()
+
+                if filename.endswith(".gif"):
                     continue
-                
-                filename = attachment.filename.lower() if attachment.filename else ""
-                if filename.endswith((".gif",)):
-                    continue
-                
+
                 try:
-                    file_data = await attachment.read()
-                    # Add SPOILER_ prefix to filename to apply spoiler tag
-                    spoiler_filename = f"SPOILER_{attachment.filename}"
-                    files.append(discord.File(
-                        fp=__import__('io').BytesIO(file_data),
-                        filename=spoiler_filename
-                    ))
+                    data = await attachment.read()
+
+                    files.append(
+                        discord.File(
+                            fp=__import__("io").BytesIO(data),
+                            filename=f"SPOILER_{attachment.filename}"
+                        )
+                    )
+
                 except Exception as e:
-                    await self.log_action(message.guild.id, f"Failed to read attachment {attachment.filename}: {e}")
-            
-            if files:
-                await webhook.send(
-                    files=files,
-                    username=message.author.display_name,
-                    avatar_url=message.author.display_avatar.url,
-                )
+                    await self.log_action(
+                        message.guild.id,
+                        f"Attachment read failed: {attachment.filename} ({e})"
+                    )
+
+            if not files:
+                return None
+
+            webhook_msg = await webhook.send(
+                files=files,
+                username=message.author.display_name,
+                avatar_url=message.author.display_avatar.url,
+                wait=True
+            )
+
+            return webhook_msg
+
         except Exception as e:
-            await self.log_action(message.guild.id, f"Failed to repost media with spoiler: {e}")
+            await self.log_action(message.guild.id, f"Webhook repost failed: {e}")
+            return None
     
     async def delete_message_after_timer(self, message: discord.Message, delay: int = 300):
         """Delete a message after the specified delay (default 5 minutes = 300 seconds)."""
@@ -141,48 +149,59 @@ class Flash(commands.Cog):
                 del self.message_timers[message.id]
     
     async def handle_flash_message(self, message: discord.Message):
-        """Handle a message in the flash channel."""
+
+        # Ignore webhook messages so we don't repost them again
+      if message.webhook_id is not None:
+            task = asyncio.create_task(self.delete_message_after_timer(message))
+            self.message_timers[message.id] = task
+            return
+          
         config = await self.config.guild(message.guild).all()
-        
-        # Check if flash is enabled and this is the flash channel
-        if not config["enabled"] or config["channel_id"] != message.channel.id:
-            return
-        
-        # Skip bot messages
-        if message.author.bot:
-            return
-        
-        # Check if this is an image or video message
-        is_image_or_video = self.message_has_image_or_video(message)
-        
-        if is_image_or_video:
-            # Repost media with spoiler
-            await self.repost_media_with_spoiler(message)
-            
-            # Ping the role if one is configured
+
+        is_media = self.message_has_image_or_video(message)
+
+        # MEDIA HANDLING
+        if is_media:
+
+            reposted = await self.repost_media_with_spoiler(message)
+
+            try:
+                await message.delete()
+            except Exception:
+                pass
+
+            if reposted:
+                task = asyncio.create_task(self.delete_message_after_timer(reposted))
+                self.message_timers[reposted.id] = task
+
             if config["role_id"]:
-                try:
-                    role = message.guild.get_role(config["role_id"])
-                    if role:
-                        await message.reply(f"{role.mention}", mention_author=False)
-                except Exception as e:
-                    await self.log_action(message.guild.id, f"Failed to ping role: {e}")
-        
-        # Create timer for message deletion
+                role = message.guild.get_role(config["role_id"])
+                if role:
+                    try:
+                        await message.channel.send(role.mention)
+                    except Exception as e:
+                        await self.log_action(message.guild.id, f"Role ping failed: {e}")
+
+            return
+
+        # NON MEDIA (text, bot, webhook, etc.)
         task = asyncio.create_task(self.delete_message_after_timer(message))
         self.message_timers[message.id] = task
     
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):
-        """Listen for messages in flash channels."""
         if message.guild is None:
             return
-        
+
         config = await self.config.guild(message.guild).all()
-        
-        # Check if flash is enabled and this is the flash channel
-        if config["enabled"] and config["channel_id"] == message.channel.id:
-            await self.handle_flash_message(message)
+
+        if not config["enabled"]:
+            return
+
+        if config["channel_id"] != message.channel.id:
+            return
+
+        await self.handle_flash_message(message)
     
     @commands.hybrid_group(name="flashset", invoke_without_command=True)
     @commands.admin_or_permissions(administrator=True)
