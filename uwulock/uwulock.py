@@ -171,7 +171,7 @@ class Uwulock(commands.Cog):
         app_commands.Choice(name="Server", value="server"),
         app_commands.Choice(name="Global", value="global"),
     ])
-   @commands.admin_or_permissions(administrator=True)
+    @commands.admin_or_permissions(administrator=True)
     @commands.guild_only()
     async def unlock(
         self,
