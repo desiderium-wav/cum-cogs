@@ -144,13 +144,13 @@ class Quote(commands.Cog):
             draw.text((text_x, y), line, fill=text_color, font=content_font)
         
         # Draw author info below message with minimal spacing
-        author_y = text_block_top + text_height + 20
+        author_y = text_block_top + text_height + 40
         
         # Author name
         draw.text((text_x, author_y), f"- {author_name}", fill=text_color, font=author_font)
         
         # Username below author name with minimal spacing
-        draw.text((text_x, author_y + 15), f"@{author_username}", fill=secondary_text, font=username_font)
+        draw.text((text_x, author_y + 20), f"@{author_username}", fill=secondary_text, font=username_font)
         
         # Convert to bytes
         buf = io.BytesIO()
