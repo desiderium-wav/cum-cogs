@@ -151,7 +151,7 @@ class Flash(commands.Cog):
     async def handle_flash_message(self, message: discord.Message):
 
         # Ignore webhook messages so we don't repost them again
-      if message.webhook_id is not None:
+        if message.webhook_id is not None:
             task = asyncio.create_task(self.delete_message_after_timer(message))
             self.message_timers[message.id] = task
             return
