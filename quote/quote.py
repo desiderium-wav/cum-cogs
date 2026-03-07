@@ -1,6 +1,6 @@
 import discord
 from redbot.core import commands, bot, Config
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFont, ImageOps
 import io
 from datetime import datetime
 from typing import Optional
@@ -42,7 +42,7 @@ class Quote(commands.Cog):
         message_id: int = None
     ) -> io.BytesIO:
         """
-        Create a stylized quote image matching Discord's "Make it a Quote" style.
+        Create a stylized quote image with large text, centered layout, and minimal dead space.
         
         Args:
             message_content: The message content to quote
@@ -50,70 +50,49 @@ class Quote(commands.Cog):
             author_username: Username of the message author
             author_avatar: Avatar image bytes
             timestamp: When the message was sent
-            color: Color accent (not prominently used in this style)
-            message_id: Message ID for tracking
+            color: Color accent (not used in this version)
+            message_id: Message ID for tracking (not displayed in this version)
         
         Returns:
             BytesIO object containing the quote image
         """
-        # Image dimensions - wider format like the reference
-        width = 900
-        height = 600
+        # Load and process avatar first to determine sizing
+        avatar_img = Image.open(io.BytesIO(author_avatar)).convert("RGBA")
         
-        # Colors - match Discord dark theme with slight adjustments
-        bg_color = (20, 20, 20)  # Very dark background
+        # Apply black and white filter
+        avatar_bw = ImageOps.grayscale(avatar_img).convert("RGBA")
+        avatar_size = 250  # Large avatar
+        avatar_bw = avatar_bw.resize((avatar_size, avatar_size), Image.Resampling.LANCZOS)
+        
+        # Colors
+        bg_color = (0, 0, 0)  # Pure black
         text_color = (220, 221, 222)  # Light text
-        secondary_text = (120, 120, 120)  # Muted text
+        secondary_text = (180, 180, 180)  # Slightly lighter secondary text
         
-        # Create image
-        img = Image.new("RGB", (width, height), bg_color)
-        draw = ImageDraw.Draw(img)
-        
-        # Load fonts
+        # Load fonts - use larger sizes
         try:
-            title_font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 48)
-            author_font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 16)
-            username_font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 13)
-            metadata_font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 12)
+            content_font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 72)
+            author_font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 44)
+            username_font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 32)
         except (OSError, IOError):
-            title_font = ImageFont.load_default()
+            content_font = ImageFont.load_default()
             author_font = ImageFont.load_default()
             username_font = ImageFont.load_default()
-            metadata_font = ImageFont.load_default()
         
-        # Load and resize avatar to larger size
-        avatar_img = Image.open(io.BytesIO(author_avatar)).convert("RGBA")
-        avatar_size = 200
-        avatar_img = avatar_img.resize((avatar_size, avatar_size), Image.Resampling.LANCZOS)
-        
-        # Add slight transparency/vignette effect to avatar
-        avatar_img = avatar_img.convert("RGBA")
-        alpha = avatar_img.split()[3]
-        alpha = alpha.point(lambda p: int(p * 0.7))
-        avatar_img.putalpha(alpha)
-        
-        # Position avatar on left side
-        avatar_x = 50
-        avatar_y = (height - avatar_size) // 2
-        img.paste(avatar_img, (avatar_x, avatar_y), avatar_img)
-        
-        # Message content positioning - right side
-        content_x = avatar_x + avatar_size + 80
-        content_y = 150
-        
-        # Wrap and draw the main message content
-        # Split into lines for wrapping
-        max_width = width - content_x - 40
+        # Wrap message content with large font
+        max_content_width = 1200  # Maximum width for text
         words = message_content.split()
         lines = []
         current_line = ""
         
+        draw_temp = ImageDraw.Draw(Image.new("RGB", (1, 1)))
+        
         for word in words:
             test_line = f"{current_line} {word}".strip()
-            bbox = draw.textbbox((0, 0), test_line, font=title_font)
+            bbox = draw_temp.textbbox((0, 0), test_line, font=content_font)
             line_width = bbox[2] - bbox[0]
             
-            if line_width > max_width and current_line:
+            if line_width > max_content_width and current_line:
                 lines.append(current_line)
                 current_line = word
             else:
@@ -122,36 +101,56 @@ class Quote(commands.Cog):
         if current_line:
             lines.append(current_line)
         
-        # Limit lines to prevent overflow
-        lines = lines[:6]
+        # Limit lines
+        lines = lines[:8]
         
-        # Draw message content
+        # Calculate dimensions
+        padding = 60
+        avatar_to_text = 80
+        line_height = 90
+        
+        # Calculate text block height
+        text_height = len(lines) * line_height
+        
+        # Calculate author block height (name + username with minimal spacing)
+        author_block_height = 44 + 10 + 32  # author font + minimal gap + username font
+        
+        # Calculate total content height
+        total_content_height = text_height + 40 + author_block_height  # 40 is spacing between text and author
+        
+        # Image dimensions - avatar on left, text on right, centered vertically
+        img_width = avatar_size + avatar_to_text + 600 + padding * 2
+        img_height = max(total_content_height + padding * 2, avatar_size + padding * 2)
+        
+        # Create image
+        img = Image.new("RGB", (img_width, img_height), bg_color)
+        draw = ImageDraw.Draw(img)
+        
+        # Center vertically
+        vertical_center = img_height // 2
+        
+        # Avatar position - left side, vertically centered
+        avatar_x = padding
+        avatar_y = vertical_center - (avatar_size // 2)
+        img.paste(avatar_bw, (avatar_x, avatar_y), avatar_bw)
+        
+        # Text position - right of avatar, vertically centered around the middle
+        text_x = avatar_x + avatar_size + avatar_to_text
+        text_block_top = vertical_center - (total_content_height // 2)
+        
+        # Draw message content lines
         for i, line in enumerate(lines):
-            y = content_y + (i * 60)
-            draw.text((content_x, y), line, fill=text_color, font=title_font)
+            y = text_block_top + (i * line_height)
+            draw.text((text_x, y), line, fill=text_color, font=content_font)
         
-        # Draw author info below message
-        author_y = content_y + (len(lines) * 60) + 40
+        # Draw author info below message with minimal spacing
+        author_y = text_block_top + text_height + 40
         
-        # Author name with custom styling
-        draw.text((content_x, author_y), f"- {author_name}", fill=text_color, font=author_font)
+        # Author name
+        draw.text((text_x, author_y), f"- {author_name}", fill=text_color, font=author_font)
         
-        # Username below author name
-        draw.text((content_x, author_y + 28), f"@{author_username}", fill=secondary_text, font=username_font)
-        
-        # Timestamp in bottom right
-        timestamp_str = timestamp.strftime("%I:%M %p").lstrip("0")
-        bbox = draw.textbbox((0, 0), timestamp_str, font=metadata_font)
-        timestamp_width = bbox[2] - bbox[0]
-        draw.text((width - timestamp_width - 30, height - 35), timestamp_str, fill=secondary_text, font=metadata_font)
-        
-        # Message ID in bottom right (like "Make it a Quote#6660")
-        if message_id:
-            msg_id_short = str(message_id)[-4:]  # Last 4 digits
-            id_text = f"Make it a Quote#{msg_id_short}"
-            bbox = draw.textbbox((0, 0), id_text, font=metadata_font)
-            id_width = bbox[2] - bbox[0]
-            draw.text((width - id_width - 30, height - 55), id_text, fill=secondary_text, font=metadata_font)
+        # Username below author name with minimal spacing
+        draw.text((text_x, author_y + 54), f"@{author_username}", fill=secondary_text, font=username_font)
         
         # Convert to bytes
         buf = io.BytesIO()
