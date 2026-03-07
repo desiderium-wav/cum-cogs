@@ -113,7 +113,7 @@ class Quote(commands.Cog):
         text_height = len(lines) * line_height
         
         # Calculate author block height (name + username with minimal spacing)
-        author_block_height = 140 + 5 + 100  # author font + minimal gap + username font
+        author_block_height = 140 + 20 + 100  # author font + minimal gap + username font
         
         # Calculate total content height
         total_content_height = text_height + 30 + author_block_height  # 40 is spacing between text and author
