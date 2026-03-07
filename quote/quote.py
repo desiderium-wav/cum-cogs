@@ -260,11 +260,14 @@ class Quote(commands.Cog):
             self.original_message = original_message
             self.quote_sender = quote_sender
             self.cog = cog
-        
-        @discord.ui.button(label="Jump to original message", style=discord.ButtonStyle.link)
-        async def jump_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-            """Button to jump to original message."""
-            button.url = self.original_message.jump_url
+            
+            # Add jump button with URL
+            jump_button = discord.ui.Button(
+                label="Jump to original message",
+                style=discord.ButtonStyle.link,
+                url=original_message.jump_url
+            )
+            self.add_item(jump_button)
         
         @discord.ui.button(label="Remove my Quote", style=discord.ButtonStyle.danger, emoji="🗑️")
         async def remove_button(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -378,8 +381,8 @@ class Quote(commands.Cog):
                     quote_image.seek(0)
                     quote_file_archive = discord.File(quote_image, filename="quote.png")
                     
-                    # Create archive view (no remove button in archive)
-                    archive_view = discord.ui.View()
+                    # Create archive view with only jump button
+                    archive_view = discord.ui.View(timeout=None)
                     archive_view.add_item(
                         discord.ui.Button(
                             label="Jump to original message",
