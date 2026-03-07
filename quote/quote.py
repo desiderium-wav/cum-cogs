@@ -80,7 +80,7 @@ class Quote(commands.Cog):
             username_font = ImageFont.load_default()
         
         # Wrap message content with large font
-        max_content_width = 1200  # Maximum width for text
+        max_content_width = 600  # Maximum width for text
         words = message_content.split()
         lines = []
         current_line = ""
@@ -106,8 +106,8 @@ class Quote(commands.Cog):
         
         # Calculate dimensions
         padding = 60
-        avatar_to_text = 80
-        line_height = 90
+        avatar_to_text = 50
+        line_height = 30
         
         # Calculate text block height
         text_height = len(lines) * line_height
@@ -119,7 +119,7 @@ class Quote(commands.Cog):
         total_content_height = text_height + 40 + author_block_height  # 40 is spacing between text and author
         
         # Image dimensions - avatar on left, text on right, centered vertically
-        img_width = avatar_size + avatar_to_text + 600 + padding * 2
+        img_width = avatar_size + avatar_to_text + 200 + padding * 2
         img_height = max(total_content_height + padding * 2, avatar_size + padding * 2)
         
         # Create image
