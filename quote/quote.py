@@ -71,7 +71,7 @@ class Quote(commands.Cog):
         
         # Load fonts - use larger sizes
         try:
-            content_font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 800)
+            content_font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 1200)
             author_font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 600)
             username_font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 200)
         except (OSError, IOError):
@@ -90,7 +90,7 @@ class Quote(commands.Cog):
         for word in words:
             test_line = f"{current_line} {word}".strip()
             bbox = draw_temp.textbbox((0, 0), test_line, font=content_font)
-            line_width = bbox[2] - bbox[0]
+            line_width = bbox[1] - bbox[0]
             
             if line_width > max_content_width and current_line:
                 lines.append(current_line)
@@ -105,9 +105,9 @@ class Quote(commands.Cog):
         lines = lines[:8]
         
         # Calculate dimensions
-        padding = 20
+        padding = 10
         avatar_to_text = 50
-        line_height = 20
+        line_height = 10
         
         # Calculate text block height
         text_height = len(lines) * line_height
