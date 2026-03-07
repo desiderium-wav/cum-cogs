@@ -3,7 +3,6 @@ from redbot.core import commands, bot, Config
 from redbot.core.utils.chat_formatting import bold
 import uwuipy
 from typing import Optional
-from typing import Union
 from discord import app_commands
 
 # Uwulock cog - handles uwulock and unlock commands with per-guild state
@@ -126,20 +125,28 @@ class Uwulock(commands.Cog):
         
         await self.config.guild(ctx.guild).log_channel_id.clear()
         await ctx.send("✅ Log channel has been cleared.", delete_after=5)
-    
+
     @commands.hybrid_command(name="uwulock", description="UWU-fy a user's messages or all members")
-    @app_commands.describe(target="User to uwulock or a scope option")
-    @app_commands.choices(target=[
+    @app_commands.describe(
+        member="Member to uwulock",
+        scope="Apply to everyone"
+    )
+    @app_commands.choices(scope=[
         app_commands.Choice(name="All Members", value="all"),
         app_commands.Choice(name="Server", value="server"),
         app_commands.Choice(name="Global", value="global"),
     ])
     @commands.admin_or_permissions(administrator=True)
     @commands.guild_only()
-    async def uwulock(self, ctx: commands.Context, target: Union[discord.Member, str]):
-        """Start UWU-fying a user's messages."""
+    async def uwulock(
+        self,
+        ctx: commands.Context,
+        member: Optional[discord.Member] = None,
+        scope: Optional[str] = None,
+    ):
+        """Start UWU-fying messages."""
 
-        if isinstance(target, str) and target.lower() in ("all", "server", "global"):
+        if scope in ("all", "server", "global"):
             async def action(m):
                 self.get_guild_state(ctx.guild.id).add(m.id)
 
@@ -147,23 +154,34 @@ class Uwulock(commands.Cog):
             await self.apply_to_all_members(ctx, action, "Uwulock")
             return
 
-        if isinstance(target, discord.Member):
-            self.get_guild_state(ctx.guild.id).add(target.id)
-            await ctx.send(f"{target.mention} has been uwulocked.")
+        if member:
+            self.get_guild_state(ctx.guild.id).add(member.id)
+            await ctx.send(f"{member.mention} has been uwulocked.")
+            return
+
+        await ctx.send("Specify a member or use the scope option.")
     
     @commands.hybrid_command(name="unlock", description="Stop UWU-fying a user's messages or all members")
-    @app_commands.describe(target="User to unlock or a scope option")
-    @app_commands.choices(target=[
+    @app_commands.describe(
+        member="Member to unlock",
+        scope="Apply to everyone"
+    )
+    @app_commands.choices(scope=[
         app_commands.Choice(name="All Members", value="all"),
         app_commands.Choice(name="Server", value="server"),
         app_commands.Choice(name="Global", value="global"),
     ])
-    @commands.admin_or_permissions(administrator=True)
+   @commands.admin_or_permissions(administrator=True)
     @commands.guild_only()
-    async def unlock(self, ctx: commands.Context, target: Union[discord.Member, str]):
-        """Stop UWU-fying a user's messages."""
+    async def unlock(
+        self,
+        ctx: commands.Context,
+        member: Optional[discord.Member] = None,
+        scope: Optional[str] = None,
+    ):
+        """Stop UWU-fying messages."""
 
-        if isinstance(target, str) and target.lower() in ("all", "server", "global"):
+        if scope in ("all", "server", "global"):
             async def action(m):
                 self.get_guild_state(ctx.guild.id).discard(m.id)
 
@@ -171,9 +189,12 @@ class Uwulock(commands.Cog):
             await self.apply_to_all_members(ctx, action, "Unlock")
             return
 
-        if isinstance(target, discord.Member):
-            self.get_guild_state(ctx.guild.id).discard(target.id)
-            await ctx.send(f"{target.mention} has been unlocked.")
+        if member:
+            self.get_guild_state(ctx.guild.id).discard(member.id)
+            await ctx.send(f"{member.mention} has been unlocked.")
+            return
+
+        await ctx.send("Specify a member or use the scope option.")
     
     def is_uwulocked(self, user_id: int, guild_id: int) -> bool:
         """Check if a user is UWU-locked in a guild."""
