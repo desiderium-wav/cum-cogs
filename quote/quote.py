@@ -80,7 +80,7 @@ class Quote(commands.Cog):
             username_font = ImageFont.load_default()
         
         # Wrap message content with large font
-        max_content_width = 400  # Maximum width for text
+        max_content_width = 800  # Maximum width for text
         words = message_content.split()
         lines = []
         current_line = ""
@@ -105,7 +105,7 @@ class Quote(commands.Cog):
         lines = lines[:8]
         
         # Calculate dimensions
-        padding = 40
+        padding = 60
         avatar_to_text = 50
         line_height = 20
         
