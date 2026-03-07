@@ -113,10 +113,10 @@ class Quote(commands.Cog):
         text_height = len(lines) * line_height
         
         # Calculate author block height (name + username with minimal spacing)
-        author_block_height = 44 + 10 + 32  # author font + minimal gap + username font
+        author_block_height = 60 + 5 + 48  # author font + minimal gap + username font
         
         # Calculate total content height
-        total_content_height = text_height + 40 + author_block_height  # 40 is spacing between text and author
+        total_content_height = text_height + 20 + author_block_height  # 40 is spacing between text and author
         
         # Image dimensions - avatar on left, text on right, centered vertically
         img_width = avatar_size + avatar_to_text + 200 + padding * 2
