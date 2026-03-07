@@ -71,16 +71,16 @@ class Quote(commands.Cog):
         
         # Load fonts - use larger sizes
         try:
-            content_font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 72)
-            author_font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 44)
-            username_font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 32)
+            content_font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 200)
+            author_font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 144)
+            username_font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 90)
         except (OSError, IOError):
             content_font = ImageFont.load_default()
             author_font = ImageFont.load_default()
             username_font = ImageFont.load_default()
         
         # Wrap message content with large font
-        max_content_width = 600  # Maximum width for text
+        max_content_width = 400  # Maximum width for text
         words = message_content.split()
         lines = []
         current_line = ""
@@ -105,9 +105,9 @@ class Quote(commands.Cog):
         lines = lines[:8]
         
         # Calculate dimensions
-        padding = 60
+        padding = 40
         avatar_to_text = 50
-        line_height = 30
+        line_height = 20
         
         # Calculate text block height
         text_height = len(lines) * line_height
