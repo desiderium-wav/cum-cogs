@@ -113,10 +113,10 @@ class Quote(commands.Cog):
         text_height = len(lines) * line_height
         
         # Calculate author block height (name + username with minimal spacing)
-        author_block_height = 60 + 5 + 48  # author font + minimal gap + username font
+        author_block_height = 140 + 5 + 100  # author font + minimal gap + username font
         
         # Calculate total content height
-        total_content_height = text_height + 20 + author_block_height  # 40 is spacing between text and author
+        total_content_height = text_height + 30 + author_block_height  # 40 is spacing between text and author
         
         # Image dimensions - avatar on left, text on right, centered vertically
         img_width = avatar_size + avatar_to_text + 200 + padding * 2
@@ -150,7 +150,7 @@ class Quote(commands.Cog):
         draw.text((text_x, author_y), f"- {author_name}", fill=text_color, font=author_font)
         
         # Username below author name with minimal spacing
-        draw.text((text_x, author_y + 10), f"@{author_username}", fill=secondary_text, font=username_font)
+        draw.text((text_x, author_y + 15), f"@{author_username}", fill=secondary_text, font=username_font)
         
         # Convert to bytes
         buf = io.BytesIO()
