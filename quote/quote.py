@@ -71,9 +71,9 @@ class Quote(commands.Cog):
         
         # Load fonts - use larger sizes
         try:
-            content_font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 200)
-            author_font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 144)
-            username_font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 90)
+            content_font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 400)
+            author_font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 250)
+            username_font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 200)
         except (OSError, IOError):
             content_font = ImageFont.load_default()
             author_font = ImageFont.load_default()
@@ -105,7 +105,7 @@ class Quote(commands.Cog):
         lines = lines[:8]
         
         # Calculate dimensions
-        padding = 40
+        padding = 20
         avatar_to_text = 50
         line_height = 20
         
