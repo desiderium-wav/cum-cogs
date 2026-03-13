@@ -1,0 +1,10 @@
+{
+  "name": "SwearJar",
+  "short": "Stupidly advanced swear jar system for some reason",
+  "description": "Detects profanity in text and voice and forces users to add to a swear jar.",
+  "author": ["cum"],
+  "requirements": ["openai-whisper", "rapidfuzz"],
+  "min_bot_version": "3.5.0",
+  "tags": ["economy", "moderation", "ai"],
+  "end_user_data_statement": "Stores swear counts and jar balance."
+}
